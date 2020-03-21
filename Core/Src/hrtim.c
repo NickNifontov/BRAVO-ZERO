@@ -157,7 +157,7 @@ void MX_HRTIM1_Init(void)
   {
     Error_Handler();
   }
-  pTimerCfg.InterruptRequests = HRTIM_TIM_IT_CPT1|HRTIM_TIM_IT_CMP1;
+  pTimerCfg.InterruptRequests = HRTIM_TIM_IT_CPT1|HRTIM_TIM_IT_CPT2;
   pTimerCfg.DMASrcAddress = 0x0000;
   pTimerCfg.DMADstAddress = 0x0000;
   pTimerCfg.DMASize = 0x1;
@@ -200,6 +200,11 @@ void MX_HRTIM1_Init(void)
   {
     Error_Handler();
   }
+  pCaptureCfg.Trigger = HRTIM_CAPTURETRIGGER_TC1_RESET;
+  if (HAL_HRTIM_WaveformCaptureConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_B, HRTIM_CAPTUREUNIT_2, &pCaptureCfg) != HAL_OK)
+  {
+    Error_Handler();
+  }
   pCaptureCfg.Trigger = HRTIM_CAPTURETRIGGER_EEV_2;
   if (HAL_HRTIM_WaveformCaptureConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_D, HRTIM_CAPTUREUNIT_2, &pCaptureCfg) != HAL_OK)
   {
@@ -230,11 +235,6 @@ void MX_HRTIM1_Init(void)
     Error_Handler();
   }
   if (HAL_HRTIM_TimeBaseConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_B, &pTimeBaseCfg) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  pCompareCfg.CompareValue = 25000;
-  if (HAL_HRTIM_WaveformCompareConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_B, HRTIM_COMPAREUNIT_1, &pCompareCfg) != HAL_OK)
   {
     Error_Handler();
   }

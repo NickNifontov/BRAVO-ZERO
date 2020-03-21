@@ -26,28 +26,29 @@ void Enable_SH_DEBUG(void);
 // *** GLOBAL FLAGS *** //
 extern volatile uint8_t BRAVO_ON;
 
-// *** Pulse Section *** //
-extern volatile uint32_t _temp_Pulse;
+// *** POLKA *** //
+extern volatile uint8_t  POLKA_MODE;
+extern volatile uint16_t  POLKA_LEVEL;
+extern volatile uint16_t  POLKA_ROLLBACK;
 
+
+// *** Pulse Section *** //
 extern volatile uint8_t PULSE_A_COMP_V; // Volt,0-no block in current stage by A, 1- block
 extern volatile uint8_t PULSE_B_COMP_V; // Volt,0-no block in current stage by B, 1- block
 
-extern volatile uint8_t PULSE_A_COMP_I; // Current,0-no block in current stage by A, 1- block
-extern volatile uint8_t PULSE_B_COMP_I; // Current,0-no block in current stage by B, 1- block
+extern volatile uint8_t PULSE_COMP_I; // Current,0-no block in current stage by A or B, 1- block
 
 extern volatile uint32_t A_DUTY_NORMAL; // Duty by Standart close situation
-extern volatile uint32_t A_DUTY_COMP; // Duty by COMP close situation
 
 extern volatile uint32_t B_DUTY_NORMAL; // Duty by Standart close situation
-extern volatile uint32_t B_DUTY_COMP; // Duty by COMP close situation
 
 void SET_ALL_ZERO_PULSES(void);
 void SET_ALL_PULSES_TO_MAX(void);
 void CLEAR_COMPV_UNBLOCK(void);
 void CLEAR_COMPI_UNBLOCK(void);
 
-uint32_t CALC_PULSE_B(void);
-uint32_t CALC_PULSE_A(void);
+void CHECK_PULSE_A(void);
+void CHECK_PULSE_B(void);
 
 // *** SINUS SECTION *** //
 extern volatile  uint16_t Curr_Sinus_Data; // curent Sinus Table Value for A+B - DAC_V

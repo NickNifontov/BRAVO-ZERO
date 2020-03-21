@@ -8,6 +8,10 @@
 #ifndef SRC_BRAVO_CONF_H_
 #define SRC_BRAVO_CONF_H_
 
+// *** POLKA *** //
+#define  POLKA_LEVEL_MAX 4095
+#define POLKA_ROLLBACK_MAX_CNT 4
+
 // *** PULSE SETTINGS *** //
 #define  MAX_A_DUTY 23300
 #define  MAX_B_DUTY 48300
@@ -17,6 +21,10 @@
 #define PULSE_CENTER 25000
 
 #define DAC_PWM_LEVEL 10
+#define DAC_PWM_LEVEL_I 10
+
+// *** CURRENT DAC *** //
+#define NORMAL_CURRENT 4000
 
 
 // *** SOFT START SETTINGS *** //

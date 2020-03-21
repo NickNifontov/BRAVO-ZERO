@@ -7,7 +7,10 @@
 
 #include "BRAVO_hal.h"
 
-volatile uint32_t _temp_Pulse=0;
+// *** POLKA *** //
+volatile uint8_t  POLKA_MODE=0;
+volatile uint16_t  POLKA_LEVEL=POLKA_LEVEL_MAX;
+volatile uint16_t  POLKA_ROLLBACK=POLKA_ROLLBACK_MAX_CNT;
 
 // *** SYSTEM *** //
 void Enable_SH_DEBUG(void) {
@@ -19,21 +22,44 @@ void Enable_SH_DEBUG(void) {
 		    __HAL_DBGMCU_FREEZE_IWDG();
 }
 
+void HAL_HRTIM_Capture2EventCallback(HRTIM_HandleTypeDef *hhrtim,
+                                              uint32_t TimerIdx)
+{
+	if (TimerIdx==HRTIM_TIMERINDEX_TIMER_B) { // Trig B, END OF IN2 OUTPUT
+		A_DUTY_NORMAL=HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_B].CPT2xR-PULSE_CENTER;
+		CHECK_PULSE_A();
+		//HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_A].CMP1xR=A_DUTY_NORMAL;
+	}
+
+	if (TimerIdx==HRTIM_TIMERINDEX_TIMER_D) {  //COMP_I IT - A or B
+			if (POLKA_MODE==0) {
+				POLKA_MODE=1;
+				POLKA_LEVEL=Curr_Sinus_Data;
+			}
+			PULSE_COMP_I=1;
+			/*if (HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_D].CPT2xR>PULSE_CENTER) { //B pulse COMP_V
+				PULSE_B_COMP_I=1;
+			} else { //A pulse COMP_V
+				PULSE_A_COMP_I=1;
+			}*/
+	}
+}
+
+
 void HAL_HRTIM_Capture1EventCallback(HRTIM_HandleTypeDef *hhrtim,
                                               uint32_t TimerIdx)
 {
 	if (TimerIdx==HRTIM_TIMERINDEX_TIMER_B) { // Trig A, END OF IN1 OUTPUT
-		    A_DUTY_NORMAL=PULSE_CENTER+(HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_B].CPT1xR);
+		    B_DUTY_NORMAL=PULSE_CENTER+(HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_B].CPT1xR);
+		    CHECK_PULSE_B();
+		    HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_C].CMP1xR=B_DUTY_NORMAL;
 	}
 
 	if (TimerIdx==HRTIM_TIMERINDEX_TIMER_D) {  //COMP_V IT - A or B
-		_temp_Pulse=HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_D].CPT1xR;
-		if (_temp_Pulse>PULSE_CENTER) { //B pulse COMP_V
+		if (HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_D].CPT1xR>PULSE_CENTER) { //B pulse COMP_V
 			PULSE_B_COMP_V=1;
-			B_DUTY_COMP=_temp_Pulse;
 		} else { //A pulse COMP_V
 			PULSE_A_COMP_V=1;
-			A_DUTY_COMP=_temp_Pulse;
 		}
 	}
 
@@ -64,7 +90,7 @@ void  HAL_HRTIM_RepetitionEventCallback(HRTIM_HandleTypeDef * hhrtim,
 		}
 
 		// Check Polka Mode
-					/*if (POLKA_MODE==1) {
+					if (POLKA_MODE==1) {
 						if (POLKA_ROLLBACK<=0) {
 							POLKA_MODE=0;
 							POLKA_ROLLBACK=POLKA_ROLLBACK_MAX_CNT;
@@ -72,7 +98,7 @@ void  HAL_HRTIM_RepetitionEventCallback(HRTIM_HandleTypeDef * hhrtim,
 						} else {
 							POLKA_ROLLBACK--;
 						}
-					}*/
+					}
 
 
 	}
@@ -92,13 +118,18 @@ void  HAL_HRTIM_RepetitionEventCallback(HRTIM_HandleTypeDef * hhrtim,
 								HAL_GPIO_WritePin(GPIOA, MCU_50HZ1_Pin, GPIO_PIN_SET); // ON 50Hz_1
 								HAL_GPIO_WritePin(GPIOA, MCU_50HZ2_Pin, GPIO_PIN_RESET); // OFF 50Hz_2
 							}
+							SET_ALL_PULSES_TO_MAX();
 				}
 
 						Curr_Sinus_Data=Sinus_Data[BRAVO_SINUS_IND];
 
-						//if ((POLKA_MODE==1) && (Curr_Sinus_Data>=POLKA_LEVEL)) {
-						//	Curr_Sinus_Data=POLKA_LEVEL;
-						//}
+						if ((POLKA_MODE==1) && (Curr_Sinus_Data>=POLKA_LEVEL)) {
+							Curr_Sinus_Data=POLKA_LEVEL;
+						}
+
+						if (POLKA_MODE==0) {
+							POLKA_LEVEL=POLKA_LEVEL_MAX;
+						}
 
 						if (SoftStart_V==1) {
 							Curr_Sinus_Data=(float)SoftStart_Coeff*(float)Curr_Sinus_Data;
@@ -106,19 +137,17 @@ void  HAL_HRTIM_RepetitionEventCallback(HRTIM_HandleTypeDef * hhrtim,
 
 						HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R,Curr_Sinus_Data+DAC_PWM_LEVEL); //Current Value of Sinus
 
+						HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R,NORMAL_CURRENT+DAC_PWM_LEVEL_I);
+
 						/*if ((BRAVO_SINUS_IND<=SMALL_CURRENT_LEFT) || (BRAVO_SINUS_IND>=SMALL_CURRENT_RIGTH)) {
 							HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R,SMALL_CURRENT); //Current Value I for this Sinus
 						} else {
 							HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R,NORMAL_CURRENT); //Current Value I for this Sinus
 						}*/
 
-							if (PULSE_B_COMP_V==1) {
-								A_DUTY_NORMAL=CALC_PULSE_A();
-								B_DUTY_NORMAL=A_DUTY_NORMAL;
-							} else {
-								SET_ALL_PULSES_TO_MAX();
-							}
-
+						if (PULSE_B_COMP_V==0) {
+							SET_ALL_PULSES_TO_MAX();
+						}
 
 							// reset blocked by COMPs flags for A and B
 							CLEAR_COMPV_UNBLOCK();
@@ -141,10 +170,7 @@ void HAL_HRTIM_Compare1EventCallback(HRTIM_HandleTypeDef *hhrtim,
 {
 	if (TimerIdx==HRTIM_TIMERINDEX_MASTER) {
 		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R,Curr_Sinus_Data); //Current Value of Sinus+SMALL VALUE
-	}
-
-	if (TimerIdx==HRTIM_TIMERINDEX_TIMER_B) { // CENTER OF PULSE - 25 000
-		HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_C].CMP1xR=CALC_PULSE_B();
+		HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R,NORMAL_CURRENT);
 	}
 }
 
@@ -153,6 +179,7 @@ void HAL_HRTIM_Compare2EventCallback(HRTIM_HandleTypeDef *hhrtim,
 {
 	if (TimerIdx==HRTIM_TIMERINDEX_MASTER) {
 		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R,Curr_Sinus_Data+DAC_PWM_LEVEL); //Current Value of Sinus+SMALL Value
+		HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R,NORMAL_CURRENT+DAC_PWM_LEVEL_I);
 	}
 }
 
@@ -161,6 +188,7 @@ void HAL_HRTIM_Compare3EventCallback(HRTIM_HandleTypeDef *hhrtim,
 {
 	if (TimerIdx==HRTIM_TIMERINDEX_MASTER) {
 		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R,Curr_Sinus_Data); //Current Value of Sinus++SMALL Value
+		HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R,NORMAL_CURRENT);
 	}
 }
 
@@ -169,6 +197,7 @@ void HAL_HRTIM_Compare4EventCallback(HRTIM_HandleTypeDef *hhrtim,
 {
 	if (TimerIdx==HRTIM_TIMERINDEX_MASTER) {
 		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R,Curr_Sinus_Data+DAC_PWM_LEVEL); //Current Value of Sinus+SMALL Value
+		HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R,NORMAL_CURRENT+DAC_PWM_LEVEL_I);
 	}
 }
 
@@ -179,8 +208,7 @@ volatile uint8_t BRAVO_ON=0;
 volatile uint8_t PULSE_A_COMP_V=0; // Volt,0-no block in current stage by A, 1- block
 volatile uint8_t PULSE_B_COMP_V=0; // Volt,0-no block in current stage by B, 1- block
 
-volatile uint8_t PULSE_A_COMP_I=0; // Current,0-no block in current stage by A, 1- block
-volatile uint8_t PULSE_B_COMP_I=0; // Current,0-no block in current stage by B, 1- block
+volatile uint8_t PULSE_COMP_I=0; // Current,0-no block in current stage by A or B, 1- block
 
 volatile uint32_t A_DUTY_NORMAL=MAX_A_DUTY; // Duty by Standart close situation
 volatile uint32_t A_DUTY_COMP=MAX_A_DUTY; // Duty by COMP close situation
@@ -188,46 +216,35 @@ volatile uint32_t A_DUTY_COMP=MAX_A_DUTY; // Duty by COMP close situation
 volatile uint32_t B_DUTY_NORMAL=MAX_B_DUTY; // Duty by Standart close situation
 volatile uint32_t B_DUTY_COMP=MAX_B_DUTY; // Duty by COMP close situation
 
-uint32_t CALC_PULSE_B(void) {
-
-	_temp_Pulse=A_DUTY_NORMAL;
-
-	if (A_DUTY_NORMAL>A_DUTY_COMP) {
-		_temp_Pulse=A_DUTY_COMP;
+void CHECK_PULSE_A(void) {
+	if (A_DUTY_NORMAL>MAX_A_DUTY) {
+		A_DUTY_NORMAL=MAX_A_DUTY;
 	}
 
-	if (_temp_Pulse>MAX_B_DUTY) {
-		_temp_Pulse=MAX_B_DUTY;
+	if (A_DUTY_NORMAL<A_PULSE_START) {
+		A_DUTY_NORMAL=A_PULSE_START;
 	}
-
-	return _temp_Pulse;
 }
 
-uint32_t CALC_PULSE_A(void) {
-
-	_temp_Pulse=B_DUTY_COMP;
-
-	if (_temp_Pulse>MAX_A_DUTY) {
-		_temp_Pulse=MAX_A_DUTY;
+void CHECK_PULSE_B(void) {
+	if (B_DUTY_NORMAL>MAX_B_DUTY) {
+		B_DUTY_NORMAL=MAX_B_DUTY;
 	}
-
-	return _temp_Pulse;
+	if (B_DUTY_NORMAL<B_PULSE_START) {
+		B_DUTY_NORMAL=B_PULSE_START;
+	}
 }
 
 void SET_ALL_ZERO_PULSES(void) {
 	 B_DUTY_NORMAL=B_PULSE_START;
-	 B_DUTY_COMP=B_PULSE_START;
 
 	 A_DUTY_NORMAL=A_PULSE_START;
-	 A_DUTY_COMP=A_PULSE_START;
 }
 
 void SET_ALL_PULSES_TO_MAX(void) {
 	 B_DUTY_NORMAL=MAX_B_DUTY;
-	 B_DUTY_COMP=MAX_B_DUTY;
 
 	 A_DUTY_NORMAL=MAX_A_DUTY;
-	 A_DUTY_COMP=MAX_A_DUTY;
 }
 
 void CLEAR_COMPV_UNBLOCK(void) {
@@ -236,8 +253,7 @@ void CLEAR_COMPV_UNBLOCK(void) {
 }
 
 void CLEAR_COMPI_UNBLOCK(void) {
-	PULSE_A_COMP_I=0;
-	PULSE_B_COMP_I=0;
+	PULSE_COMP_I=0;
 }
 
 // *** SINUS SECTION *** //
@@ -297,7 +313,7 @@ void BRAVO_SoftStart_OFF(void) {
 
 // *** LED SECTION *** //
 void UpdateSD_LED(void) {
-	if (BRAVO_ON==1) {
+	if (BRAVO_ON==0) {
 		HAL_GPIO_WritePin(LED_SD_GPIO_Port, LED_SD_Pin, GPIO_PIN_SET); // OFF LED
 	} else {
 		HAL_GPIO_WritePin(LED_SD_GPIO_Port, LED_SD_Pin, GPIO_PIN_RESET); // ON LED
@@ -313,9 +329,9 @@ void COMP_DAC_Start(void) {
 
 	  // DAC2 and COMP4
 	  HAL_DAC_Start(&hdac2, DAC_CHANNEL_1);
-	  HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0); // default I is ZERO
+	  HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R, NORMAL_CURRENT); // default I is ZERO
 
-	  //HAL_COMP_Start(&hcomp4);
+	  HAL_COMP_Start(&hcomp4);
 
 }
 
@@ -391,7 +407,7 @@ void _BRAVO_Stop_HRTIM(void) {
 
 void _BRAVO_DAC_ZERO(void) {
 	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0); // default V is ZERO
-	HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0); // default I is ZERO
+	HAL_DAC_SetValue(&hdac2, DAC_CHANNEL_1, DAC_ALIGN_12B_R, NORMAL_CURRENT); // default I is ZERO
 }
 
 void _BRAVO_Global_Def(void) {
@@ -399,8 +415,8 @@ void _BRAVO_Global_Def(void) {
 	CLEAR_COMPV_UNBLOCK();
 	CLEAR_COMPI_UNBLOCK();
 
-	// Set A+B to MAX
-	SET_ALL_PULSES_TO_MAX();
+	// Set A+B to MIN
+	SET_ALL_ZERO_PULSES();
 
 	Curr_Sinus_Data=0; // reset DAC_V
 
