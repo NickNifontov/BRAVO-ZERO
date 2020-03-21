@@ -67,6 +67,7 @@ void HRTIM1_Master_IRQHandler(void);
 void HRTIM1_TIMA_IRQHandler(void);
 void HRTIM1_TIMB_IRQHandler(void);
 void HRTIM1_TIMC_IRQHandler(void);
+void HRTIM1_TIMD_IRQHandler(void);
 void HRTIM1_FLT_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 
